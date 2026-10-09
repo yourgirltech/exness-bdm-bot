@@ -1,0 +1,1317 @@
+{
+  "name": "Exness BDM Bot - Telegram Agent",
+  "nodes": [
+    {
+      "id": "736d0bc0-f1dd-4318-b074-2ff2d743c034",
+      "name": "Poll Telegram Every 5s",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds",
+              "secondsInterval": 5
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "429c85b7-3fad-4645-84ba-e08b327c8cc4",
+      "name": "Get Telegram Updates",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.telegram.org/botYOUR_TELEGRAM_BOT_TOKEN/getUpdates",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "timeout",
+              "value": "0"
+            },
+            {
+              "name": "limit",
+              "value": "20"
+            },
+            {
+              "name": "allowed_updates",
+              "value": "[\"message\"]"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "58be4915-96dc-4ff8-87f5-904c87bb2b2e",
+      "name": "Compute Ack Offset",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const res = $input.first().json || {};\nconst updates = Array.isArray(res.result) ? res.result : [];\nif (!updates.length) return [];\nlet max = 0;\nfor (const u of updates) if (u.update_id > max) max = u.update_id;\nreturn [{ json: { next_offset: max + 1 } }];"
+      }
+    },
+    {
+      "id": "086e127f-4e1a-4be6-beb3-76b164111ca3",
+      "name": "Acknowledge Updates",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        660,
+        100
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.telegram.org/botYOUR_TELEGRAM_BOT_TOKEN/getUpdates",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "offset",
+              "value": "={{ $json.next_offset }}"
+            },
+            {
+              "name": "limit",
+              "value": "1"
+            },
+            {
+              "name": "timeout",
+              "value": "0"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "69a8aa53-de41-4c60-bd6b-2f1cd7fcfe2a",
+      "name": "Parse Messages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        400
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const res = $input.first().json || {};\nconst updates = Array.isArray(res.result) ? res.result : [];\nconst tradingRe = /\\b(spreads?|swaps?|swap-free|margin|leverage|lots?|deposit\\w*|withdraw\\w*|fund\\w*|balance|account types?|standard|raw spread|zero|pro account|mt4|mt5|metatrader|platform|stop ?out|trad(e|es|ing)|scalp\\w*|kyc|verif\\w*|pips?|gold|xauusd|eurusd|nfp|cpi|fomc|news)\\b/i;\nconst ibRe = /\\b(ib|introducing broker|referr\\w*|refer|affiliate\\w*|partner\\w*|rebates?|sub-?accounts?|traffic|sign-?ups?|downline|network|leads?|cpa|revenue share|my clients|milestone)\\b/i;\nconst out = [];\nfor (const u of updates) {\n  const m = u.message;\n  if (!m || typeof m.text !== 'string' || !m.chat) continue;\n  const text = m.text.trim();\n  const t = tradingRe.test(text);\n  const i = ibRe.test(text);\n  const track = t && i ? 'MIXED' : (i ? 'IB' : (t ? 'TRADING' : 'GENERAL'));\n  out.push({ json: {\n    update_id: u.update_id,\n    chat_id: String(m.chat.id),\n    first_name: (m.from && m.from.first_name) || 'there',\n    text,\n    track,\n    reply_to_text: (m.reply_to_message && m.reply_to_message.text) || '',\n    received_at: new Date((m.date || 0) * 1000).toISOString()\n  }});\n}\nreturn out;"
+      }
+    },
+    {
+      "id": "2cdcdcf9-c11e-4d2f-a1cb-e3ca88c69a94",
+      "name": "Register Client in CRM",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        400
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "INVE0xh2Vtt6TCpj",
+          "cachedResultName": "exness_crm_demo"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "chat_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.chat_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "chat_id": "={{ $json.chat_id }}",
+            "first_name": "={{ $json.first_name }}",
+            "last_track": "={{ $json.track }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "first_name",
+              "displayName": "first_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_track",
+              "displayName": "last_track",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "3247c945-9069-47eb-b551-1fe69e8ded94",
+      "name": "Fetch CRM Record",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        400
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "INVE0xh2Vtt6TCpj",
+          "cachedResultName": "exness_crm_demo"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "chat_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Parse Messages').item.json.chat_id }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      }
+    },
+    {
+      "id": "0dd1bd49-359f-47df-a06e-c58b9c48dc98",
+      "name": "Build Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        400
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "const STAFF_CHAT_IDS = ['YOUR_STAFF_CHAT_ID'];\nconst p = $('Parse Messages').item.json;\nconst c = $input.item.json || {};\nconst crm = {\n  registered: c.registered === true,\n  kyc_verified: c.kyc_verified === true,\n  ftd_amount: Number(c.ftd_amount || 0),\n  balance: Number(c.balance || 0),\n  days_inactive: Number(c.days_inactive || 0),\n  is_ib: c.is_ib === true,\n  ib_referrals: Number(c.ib_referrals || 0),\n  ib_link: c.ib_link || '',\n  one_on_one_booked: c.one_on_one_booked === true,\n  escalated: c.escalated === true,\n  escalation_reason: c.escalation_reason || '',\n  last_staff_note: c.last_staff_note || ''\n};\n\nlet staff = null;\nif (STAFF_CHAT_IDS.includes(p.chat_id)) {\n  const replyCmd = p.text.match(/^\\/reply\\s+(-?\\d+)\\s+([\\s\\S]+)/i);\n  const resumeCmd = p.text.match(/^\\/resume(?:\\s+(-?\\d+))?\\s*$/i);\n  const alertTarget = (p.reply_to_text.match(/Telegram (-?\\d+)/) || [])[1];\n  if (replyCmd) staff = { target_chat_id: replyCmd[1], staff_text: replyCmd[2].trim() };\n  else if (resumeCmd) staff = { target_chat_id: resumeCmd[1] || p.chat_id, staff_text: '' };\n  else if (alertTarget && !p.text.startsWith('/')) staff = { target_chat_id: alertTarget, staff_text: p.text };\n}\nif (staff) {\n  return { json: { ...p, crm, route: 'staff', ...staff, staff_name: p.first_name } };\n}\n\nconst BOOKING_LINK = 'https://example.com/book/piriye-1on1 (demo booking link)';\nconst reasons = [];\nif (!crm.registered) reasons.push('no registered personal trading account');\nif (crm.registered && !crm.kyc_verified) reasons.push('KYC verification not completed');\nif (crm.ftd_amount <= 0) reasons.push('no confirmed first-time deposit');\nif (crm.balance <= 0) reasons.push('personal account balance is 0 (unfunded)');\nconst eligible = reasons.length === 0;\nconst yn = (b) => (b ? 'YES' : 'NO');\n\nconst humanRe = /\\b(speak|talk|chat|connect)\\b.{0,25}\\b(human|person|agent|manager|someone real|real person|sales ?rep|representative|staff|support team)\\b|\\b(live agent|real human|human agent)\\b/i;\nconst seriousRe = /\\b(scam(med)?|fraud|hacked|stolen|unauthori[sz]ed|lawyer|sue|suing|police|regulator|chargeback|report (you|exness))\\b/i;\nlet hardTrigger = '';\nif (seriousRe.test(p.text)) hardTrigger = 'Serious issue raised (fraud, security, legal or regulatory)';\nelse if (humanRe.test(p.text)) hardTrigger = 'Client explicitly asked for a human';\n\nlet route = 'agent';\nif (/^\\/demo\\b/i.test(p.text)) route = 'demo';\nelse if (crm.escalated || crm.one_on_one_booked) route = 'frozen';\n\nconst trackGuide = {\n  TRADING: 'BDM MODE only (Thread_Retail_Trading). Do not add IB/affiliate content.',\n  IB: 'IB GROWTH MANAGER MODE only (Thread_Affiliate_IB). Do not add trading-account content unless asked. No signature.',\n  MIXED: 'BOTH TRACKS. Answer in two clearly separated numbered sections: \"1️⃣ YOUR TRADING ACCOUNT\" then \"2️⃣ YOUR IB BUSINESS\". Keep each section strictly within its own thread data.',\n  GENERAL: 'No specific track detected. If this is a greeting or /start, welcome them warmly and qualify them (new to trading? already have an Exness account? interested in the IB partner programme?). If they reply with a number or short answer, map it to the options you offered earlier. Otherwise use the most relevant track.'\n}[p.track];\n\nconst prompt = [\n  '[CLIENT MESSAGE]',\n  p.text,\n  '',\n  '[ROUTING] Detected track: ' + p.track + ' -> ' + trackGuide,\n  hardTrigger ? '[ESCALATION] HARD TRIGGER: ' + hardTrigger + '. You MUST escalate: write a short empathetic handoff reply and end with the [[ESCALATE: reason]] tag.' : '[ESCALATION] No hard trigger. Handle it yourself unless the escalation policy clearly applies.',\n  crm.last_staff_note ? '[STAFF HANDOFF NOTE] A human member of Mr. Piriye\\'s team recently took over this chat and their latest message to the client was: \"' + crm.last_staff_note + '\". The chat has been handed back to you. Continue naturally from what staff said, never contradict their commitments, and do not re-escalate for the same issue unless the client is still clearly unhappy.' : '',\n  '',\n  '[Thread_Retail_Trading - live CRM snapshot]',\n  '- Registered personal account: ' + yn(crm.registered),\n  '- KYC verified: ' + yn(crm.kyc_verified),\n  '- First-time deposit: ' + crm.ftd_amount + ' USD',\n  '- Current balance: ' + crm.balance + ' USD',\n  '- Days since last trade: ' + crm.days_inactive + (crm.days_inactive >= 20 ? ' (DORMANT - use the reactivation approach if relevant)' : ''),\n  '- 1-on-1 strategy session eligibility (validated against CRM just now): ' + (eligible ? 'ELIGIBLE' : 'NOT ELIGIBLE - ' + reasons.join('; ')),\n  '- Booking link: ' + (eligible ? BOOKING_LINK : 'LOCKED. Do not share, invent or hint at any booking link or calendar.'),\n  '',\n  '[Thread_Affiliate_IB - live CRM snapshot]',\n  '- IB partner: ' + yn(crm.is_ib),\n  '- Verified referrals: ' + crm.ib_referrals + (crm.ib_referrals >= 10 ? ' (10+ MILESTONE REACHED - celebrate it)' : ''),\n  '- Partner link: ' + (crm.ib_link || 'none yet'),\n  '',\n  '[CLIENT] First name: ' + p.first_name + ' | Today: ' + new Date().toISOString().slice(0, 10)\n].filter((l, i, a) => l !== '' || a[i - 1] !== '').join('\\n');\n\nreturn { json: { ...p, crm, eligible, route, hard_trigger: hardTrigger, agent_prompt: prompt } };"
+      }
+    },
+    {
+      "id": "c4e8492e-786d-47e5-92b6-625e0c5a3a0b",
+      "name": "Route Message",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1320,
+        400
+      ],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "renameOutput": true,
+              "outputKey": "demo",
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "demo"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "renameOutput": true,
+              "outputKey": "frozen",
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "frozen"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "renameOutput": true,
+              "outputKey": "agent",
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "agent"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "renameOutput": true,
+              "outputKey": "staff",
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "staff"
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "46613a8d-60f3-4e35-8772-19159d941cb8",
+      "name": "Apply Demo Command",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        160
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "const ctx = $input.item.json;\nconst s = { ...ctx.crm };\nconst parts = ctx.text.trim().split(/\\s+/);\nconst cmd = (parts[1] || 'help').toLowerCase();\nconst num = Number(parts[2]);\nlet reply = '';\nlet showState = true;\nconst DEMO_LINK = 'https://one.exness.link/a/demo-ib-' + ctx.chat_id.slice(-5);\nswitch (cmd) {\n  case 'register':\n    s.registered = true; s.kyc_verified = true;\n    reply = 'Demo CRM: account REGISTERED and KYC VERIFIED (unfunded).'; break;\n  case 'fund': {\n    const amt = Number.isFinite(num) && num > 0 ? num : 500;\n    s.registered = true; s.kyc_verified = true; s.ftd_amount = s.ftd_amount > 0 ? s.ftd_amount : amt; s.balance = amt; s.days_inactive = 0;\n    reply = 'Demo CRM: FTD confirmed, balance set to ' + amt + ' USD.'; break; }\n  case 'unfund':\n    s.balance = 0; reply = 'Demo CRM: balance set to 0 USD (unfunded).'; break;\n  case 'ib': {\n    const n = Number.isFinite(num) && num >= 0 ? num : 10;\n    s.is_ib = true; s.ib_referrals = n; s.ib_link = s.ib_link || DEMO_LINK;\n    reply = 'Demo CRM: IB partner ACTIVE with ' + n + ' verified referrals.'; break; }\n  case 'dormant':\n    s.registered = true; s.kyc_verified = true; s.ftd_amount = s.ftd_amount > 0 ? s.ftd_amount : 100; s.balance = 4; s.days_inactive = 25;\n    reply = 'Demo CRM: account DORMANT (25 days inactive, balance 4 USD).'; break;\n  case 'book':\n    if (!ctx.eligible) { reply = 'Demo CRM: cannot book. The client is not eligible (personal account must be verified and funded). Try /demo fund 500 first.'; break; }\n    s.one_on_one_booked = true;\n    reply = 'Demo CRM: 1-on-1 BOOKED. Automation is now FROZEN for this chat and routed to Mr. Piriye. Send /demo resume to hand back to the AI.'; break;\n  case 'escalate':\n    s.escalated = true; s.escalation_reason = 'Manual escalation (demo)';\n    reply = 'Demo CRM: chat ESCALATED to a live sales rep. AI replies paused. Send /demo resume to hand back to the AI.'; break;\n  case 'resume':\n  case 'unfreeze':\n    s.one_on_one_booked = false; s.escalated = false; s.escalation_reason = '';\n    reply = 'Demo CRM: automation RESUMED. Priye (AI) is handling this chat again.'; break;\n  case 'reset':\n    Object.assign(s, { registered: false, kyc_verified: false, ftd_amount: 0, balance: 0, days_inactive: 0, is_ib: false, ib_referrals: 0, ib_link: '', one_on_one_booked: false, escalated: false, escalation_reason: '', last_staff_note: '' });\n    reply = 'Demo CRM: profile RESET to a brand-new lead.'; break;\n  case 'status':\n    reply = 'Demo CRM status:'; break;\n  default:\n    showState = false;\n    reply = [\n      'Demo controls (simulate the Exness CRM):',\n      '/demo status - show this client record',\n      '/demo register - registered + KYC, unfunded',\n      '/demo fund 500 - confirm FTD and set balance',\n      '/demo unfund - set balance to 0',\n      '/demo ib 10 - make client an IB with N verified referrals',\n      '/demo dormant - 25 days inactive, low balance',\n      '/demo book - book the 1-on-1 (only if eligible) and pause the AI',\n      '/demo escalate - hand the chat to a live sales rep',\n      '/demo resume - hand the chat back to the AI',\n      '/demo reset - back to a new lead',\n      '',\n      'Staff: reply to an escalation alert to answer the client (AI resumes automatically), or use /reply <chat_id> <message> or /resume <chat_id>.'\n    ].join('\\n');\n}\nconst elig = s.registered && s.kyc_verified && s.ftd_amount > 0 && s.balance > 0;\nif (showState) {\n  reply += '\\n\\nRegistered: ' + s.registered + ' | KYC: ' + s.kyc_verified + ' | FTD: ' + s.ftd_amount + ' | Balance: ' + s.balance + ' | Days inactive: ' + s.days_inactive + '\\nIB: ' + s.is_ib + ' | Referrals: ' + s.ib_referrals + ' | 1-on-1 eligible: ' + elig + ' | Booked: ' + s.one_on_one_booked + ' | Escalated: ' + s.escalated;\n}\nreturn { json: { chat_id: ctx.chat_id, ...s, reply } };"
+      }
+    },
+    {
+      "id": "e11ba7eb-7564-4730-be2d-92c48f420bf6",
+      "name": "Save Demo State",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1780,
+        160
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "INVE0xh2Vtt6TCpj",
+          "cachedResultName": "exness_crm_demo"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "chat_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.chat_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "value": {
+            "registered": "={{ $json.registered }}",
+            "kyc_verified": "={{ $json.kyc_verified }}",
+            "ftd_amount": "={{ $json.ftd_amount }}",
+            "balance": "={{ $json.balance }}",
+            "days_inactive": "={{ $json.days_inactive }}",
+            "is_ib": "={{ $json.is_ib }}",
+            "ib_referrals": "={{ $json.ib_referrals }}",
+            "ib_link": "={{ $json.ib_link }}",
+            "one_on_one_booked": "={{ $json.one_on_one_booked }}",
+            "escalated": "={{ $json.escalated }}",
+            "escalation_reason": "={{ $json.escalation_reason }}",
+            "last_staff_note": "={{ $json.last_staff_note || '' }}"
+          },
+          "schema": [
+            {
+              "id": "registered",
+              "displayName": "registered",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "kyc_verified",
+              "displayName": "kyc_verified",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "ftd_amount",
+              "displayName": "ftd_amount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "balance",
+              "displayName": "balance",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "days_inactive",
+              "displayName": "days_inactive",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "is_ib",
+              "displayName": "is_ib",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "ib_referrals",
+              "displayName": "ib_referrals",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "ib_link",
+              "displayName": "ib_link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "one_on_one_booked",
+              "displayName": "one_on_one_booked",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "escalated",
+              "displayName": "escalated",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "escalation_reason",
+              "displayName": "escalation_reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_staff_note",
+              "displayName": "last_staff_note",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "7c92f646-545d-4cc7-9d1b-4753519c0c6b",
+      "name": "Send Demo Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2000,
+        160
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_TELEGRAM_BOT_TOKEN/sendMessage",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('Apply Demo Command').item.json.chat_id, text: $('Apply Demo Command').item.json.reply }) }}",
+        "options": {}
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "ad7ef893-26c8-46e6-8b3b-da23f1549d8b",
+      "name": "Send Human Handoff Notice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1560,
+        400
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_TELEGRAM_BOT_TOKEN/sendMessage",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $json.chat_id, text: $json.crm.escalated ? ('Thanks, ' + $json.first_name + '. A senior member of Mr. Piriye\\'s sales team is handling your chat and has received your message. They will reply here as soon as possible. 🙏') : ('Thank you, ' + $json.first_name + '. Your 1-on-1 strategy session with Mr. Piriye is confirmed, so I have paused automated replies and routed this conversation directly to his desk. He will personally respond here shortly.') }) }}",
+        "options": {}
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "6a62014d-8e5d-47ff-84dd-5e3f6ca7f531",
+      "name": "Priye BDM + IB Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1560,
+        640
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.agent_prompt }}",
+        "options": {
+          "systemMessage": "You are \"Priye\", the 24/7 AI assistant for an Exness Business Development Manager and IB Growth Manager team, working alongside Mr. Piriye Uzenabor (the human Account Manager) and a live sales team. You chat with clients on Telegram.\n\nPERSONALITY: professional, warm, empathetic and persuasive. Celebrate wins, remove friction, and always move the client one clear step forward (register, verify, fund, trade, refer, grow). You are confident and knowledgeable about Exness as a company and handle objections calmly.\n\nKNOWLEDGE: Use the exness_knowledge_base tool for ANY fact about Exness: the company (history since 2008, leadership, headquarters, offices, regulation and licences, Deloitte audits, security, sponsorships, CSR), products and instruments, account types, spreads, commission, leverage, margin, stop out, lot limits, swap-free, deposits and withdrawals, platforms and tools (Exness Trade app, Terminal, MT4/MT5, Social Trading, VPS), support channels, the IB revenue share and CPA programmes, coaching playbooks, objection handling and policies. Search more than once if needed. Never invent numbers, fees, links, people or promotions. If the knowledge base does not cover it, say so honestly and point to the Exness Personal Area or 24/7 Support chat.\n\nDUAL-TRACK PROTOCOL (strict):\n- Every message comes with a [ROUTING] line and two separate CRM blocks: Thread_Retail_Trading and Thread_Affiliate_IB. Treat them as two separate pipelines.\n- TRADING track = BDM mode (accounts, funding, education, margin, volatility). IB track = IB Growth Manager mode (referral link, sign-ups, traffic, rebates, coaching).\n- MIXED messages must be answered in two clearly separated numbered sections exactly titled \"1️⃣ YOUR TRADING ACCOUNT\" and \"2️⃣ YOUR IB BUSINESS\". Never let data from one thread leak into the other section.\n- If the client replies with a short answer such as a number from a menu you offered, use the conversation history to understand it and continue the flow. Never ignore it.\n\n1-ON-1 SESSION GATE (strict): Only share the booking link if the trading CRM block says ELIGIBLE, and copy it exactly. If NOT ELIGIBLE, celebrate any IB achievements, explain warmly that a verified, funded personal account is required to protect Mr. Piriye's schedule, list the exact missing items, and guide them to fund via the Exness Personal Area. Never invent or hint at a booking link.\n\nESCALATION TO A LIVE SALES REP: You handle almost everything yourself, including skeptical questions, objections, mild complaints and comparisons. Escalate ONLY when it is genuinely tough:\n- the client explicitly insists on a human, agent or manager;\n- anger or frustration keeps rising after you have already tried to help (two or more frustrated messages);\n- money disputes (missing deposit, stuck or rejected withdrawal, disputed trade, refund or chargeback);\n- account security (hacked account, unauthorised activity, phishing, fraud);\n- legal or regulatory threats;\n- large or VIP opportunities (deposits of 10,000 USD or more, institutional or corporate accounts, IBs negotiating custom deals);\n- or the [ESCALATION] line says HARD TRIGGER.\nWhen you escalate: write a short, calm, empathetic reply saying a senior member of Mr. Piriye's sales team is taking over this chat and will reply here as soon as possible. Do not promise outcomes or exact times, and never ask for passwords or OTP codes. Then put this tag on the very last line, by itself: [[ESCALATE: short reason]]. Never use the tag otherwise, and never mention the tag to the client.\n\nSIGNATURE ISOLATION (strict): Never add the \"Piriye Uzenabor, Account Manager\" signature block in these chats. Onboarding, support, education, market news, competitor comparisons and IB coaching never carry it. (It is only added by the separate broadcast campaign workflow.)\n\nCOMPLIANCE: Trading CFDs/forex carries a high risk of loss. Never promise profits, never give personalised investment advice or trade signals, never disparage competitors. Add a short risk reminder when discussing leverage, strategy or market events.\n\nFORMAT (Telegram plain text): no Markdown symbols such as ** or #. Use short paragraphs, simple dashes for lists and a few tasteful emojis. Keep replies under about 180 words (MIXED replies can be up to about 280). End with one clear next step or question (except escalation replies). Address the client by first name occasionally.",
+          "maxIterations": 6,
+          "enableStreaming": false
+        },
+        "needsFallback": true
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "178f7c17-5b10-436d-a221-3354308ab911",
+      "name": "Claude Sonnet 5.5",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.6,
+      "position": [
+        1440,
+        860
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-5-5",
+          "cachedResultName": "Claude Sonnet 5.5"
+        },
+        "options": {
+          "maxTokensToSample": 1500
+        }
+      },
+      "credentials": {
+        "anthropicApi": {
+          "id": "",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "id": "618336cb-7b06-499b-945c-6e60fdc419fb",
+      "name": "Per-Client Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        1600,
+        860
+      ],
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.chat_id || $('Build Context').first().json.chat_id }}",
+        "contextWindowLength": 10
+      }
+    },
+    {
+      "id": "e4cce896-0db1-434a-ba34-8799b087f3c8",
+      "name": "exness_knowledge_base",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreInMemory",
+      "typeVersion": 1.3,
+      "position": [
+        1780,
+        860
+      ],
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "Search the Exness knowledge base: account types (Standard, Pro, Zero, Raw Spread), spreads, commissions, leverage, margin call, stop out, lot limits, swap-free, deposits and withdrawals, onboarding/KYC, platforms, IB revenue share programme, CPA affiliate programme, loyalty programme, IB growth coaching playbook, market event guidance, dormant reactivation playbook, and assistant policies. Use it before answering any factual question.",
+        "memoryKey": {
+          "__rl": true,
+          "mode": "id",
+          "value": "exness_kb"
+        },
+        "topK": 5,
+        "includeDocumentMetadata": true
+      }
+    },
+    {
+      "id": "3c06e534-4098-495d-9156-1ac26ea3b56a",
+      "name": "Gemini Query Embeddings",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1800,
+        1060
+      ],
+      "parameters": {
+        "modelName": "models/gemini-embedding-001"
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "id": "718d66c3-4680-4983-8096-c4c8dcaeaf99",
+      "name": "Prepare Telegram Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1900,
+        640
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const ctxs = $('Build Context').all().filter(i => i.json.route === 'agent').map(i => i.json);\nconst out = [];\n$input.all().forEach((item, idx) => {\n  const ctx = ctxs[idx] || ctxs[0] || {};\n  let raw = String(item.json.output || '');\n  let escalate = false;\n  let reason = '';\n  const m = raw.match(/\\[\\[\\s*ESCALATE\\s*:?\\s*([^\\]]*)\\]\\]/i);\n  if (m) { escalate = true; reason = (m[1] || '').trim(); raw = raw.replace(m[0], ''); }\n  if (!escalate && ctx.hard_trigger) { escalate = true; reason = ctx.hard_trigger; }\n  raw = raw.replace(/\\*\\*(.+?)\\*\\*/g, '$1').replace(/^#+\\s*/gm, '').trim();\n  const text = raw || ('Sorry ' + (ctx.first_name || 'there') + ', I hit a small hiccup just now. Could you send that again? If it keeps happening, Mr. Piriye\\'s team will follow up shortly.');\n  const chatId = item.json.chat_id || ctx.chat_id;\n  if (chatId) out.push({ json: { chat_id: chatId, text: text.slice(0, 4000), escalate, escalation_reason: (reason || 'Conversation needs a human').slice(0, 300), first_name: ctx.first_name || '', client_message: ctx.text || '', track: ctx.track || '' } });\n});\nreturn out;"
+      }
+    },
+    {
+      "id": "875b448a-fbd5-4c6e-ae13-86ac83d4cf08",
+      "name": "Send Agent Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2120,
+        640
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_TELEGRAM_BOT_TOKEN/sendMessage",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $json.chat_id, text: $json.text, disable_web_page_preview: true }) }}",
+        "options": {}
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "fe2fc294-af12-414a-9751-61751119399c",
+      "name": "Sticky Note d4bc801c",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        100,
+        300
+      ],
+      "parameters": {
+        "content": "## Exness BDM + IB Telegram Bot (@PriyeBot)\nPolls Telegram every 5s (n8n runs on localhost, so no webhook). Each message: CRM lookup, dual-track routing and 1-on-1 eligibility validated in code, Claude agent with RAG over exness_kb, reply. Run the KB Ingestion workflow after any n8n restart. Type /demo in Telegram to simulate CRM states.",
+        "color": 5
+      }
+    },
+    {
+      "id": "34440fc8-e961-4581-8e41-3b22b53d9cef",
+      "name": "Needs Escalation?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        2120,
+        860
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.escalate }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "d1abd867-dbdb-4172-8cf9-c34ff574dae2",
+      "name": "Mark Escalated in CRM",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2340,
+        860
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "INVE0xh2Vtt6TCpj",
+          "cachedResultName": "exness_crm_demo"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "chat_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.chat_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "value": {
+            "escalated": "={{ true }}",
+            "escalation_reason": "={{ $json.escalation_reason }}"
+          },
+          "schema": [
+            {
+              "id": "escalated",
+              "displayName": "escalated",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "escalation_reason",
+              "displayName": "escalation_reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "6f8533f6-27a0-407c-9a04-c86ea6b9a00d",
+      "name": "Alert Sales Rep",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2560,
+        860
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_TELEGRAM_BOT_TOKEN/sendMessage",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: 'YOUR_STAFF_CHAT_ID', text: '🚨 ESCALATION — live sales rep needed\\n\\nClient: ' + $('Needs Escalation?').item.json.first_name + ' (Telegram ' + $('Needs Escalation?').item.json.chat_id + ')\\nTrack: ' + $('Needs Escalation?').item.json.track + '\\nReason: ' + $('Needs Escalation?').item.json.escalation_reason + '\\n\\nLast message:\\n\"' + $('Needs Escalation?').item.json.client_message + '\"\\n\\nAI replies are paused for this chat.\\n↩️ REPLY to this message to answer the client. Priye resumes automatically after your reply.\\nOr send /resume ' + $('Needs Escalation?').item.json.chat_id + ' to hand back without a message.' }) }}",
+        "options": {}
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "f02116e6-ff31-4f4c-8ef5-f46d87594515",
+      "name": "Forward to Sales Rep",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1780,
+        400
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_TELEGRAM_BOT_TOKEN/sendMessage",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: 'YOUR_STAFF_CHAT_ID', text: '📩 New message in paused chat\\nClient: ' + $('Build Context').item.json.first_name + ' (Telegram ' + $('Build Context').item.json.chat_id + ')\\nStatus: ' + ($('Build Context').item.json.crm.escalated ? 'Escalated: ' + $('Build Context').item.json.crm.escalation_reason : '1-on-1 booked') + '\\n\\n\"' + $('Build Context').item.json.text + '\"\\n\\n↩️ Reply to this message to answer the client.' }) }}",
+        "options": {}
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "6e9aacd5-12d1-49e9-ace0-36043b9511c0",
+      "name": "Gemini Fallback Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        1300,
+        1060
+      ],
+      "parameters": {
+        "modelName": "models/gemini-3-flash-preview",
+        "options": {
+          "maxOutputTokens": 1500,
+          "temperature": 0.4
+        }
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "id": "af6f1d07-073d-4c5a-bf84-8afe9aa60786",
+      "name": "Hand Chat Back to AI",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1560,
+        -100
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "INVE0xh2Vtt6TCpj",
+          "cachedResultName": "exness_crm_demo"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "chat_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.target_chat_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "value": {
+            "escalated": "={{ false }}",
+            "escalation_reason": "",
+            "one_on_one_booked": "={{ false }}",
+            "last_staff_note": "={{ $json.staff_text || $('Build Context').item.json.crm.last_staff_note || '' }}"
+          },
+          "schema": [
+            {
+              "id": "escalated",
+              "displayName": "escalated",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "escalation_reason",
+              "displayName": "escalation_reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "one_on_one_booked",
+              "displayName": "one_on_one_booked",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_staff_note",
+              "displayName": "last_staff_note",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b256e45d-1c0f-4105-919e-d10dfd4ed554",
+      "name": "Has Staff Message?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        1780,
+        -200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Build Context').item.json.staff_text }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "568d0578-e804-44c1-a92c-707517e8bd43",
+      "name": "Send Staff Reply to Client",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2000,
+        -200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_TELEGRAM_BOT_TOKEN/sendMessage",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('Build Context').item.json.target_chat_id, text: '👤 Message from Mr. Piriye\\'s team:\\n\\n' + $('Build Context').item.json.staff_text }) }}",
+        "options": {}
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "d311f77d-7440-4ea4-8fcb-1ae4a0f0efbf",
+      "name": "Confirm to Staff",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1780,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/botYOUR_TELEGRAM_BOT_TOKEN/sendMessage",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('Build Context').item.json.chat_id, text: ($('Build Context').item.json.staff_text ? '✅ Your reply was delivered to client ' : '✅ Chat resumed for client ') + $('Build Context').item.json.target_chat_id + '. Priye (AI) is handling the conversation again and knows what you said.' }) }}",
+        "options": {}
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    }
+  ],
+  "connections": {
+    "Poll Telegram Every 5s": {
+      "main": [
+        [
+          {
+            "node": "Get Telegram Updates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Telegram Updates": {
+      "main": [
+        [
+          {
+            "node": "Compute Ack Offset",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Parse Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Ack Offset": {
+      "main": [
+        [
+          {
+            "node": "Acknowledge Updates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Messages": {
+      "main": [
+        [
+          {
+            "node": "Register Client in CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Register Client in CRM": {
+      "main": [
+        [
+          {
+            "node": "Fetch CRM Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch CRM Record": {
+      "main": [
+        [
+          {
+            "node": "Build Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Context": {
+      "main": [
+        [
+          {
+            "node": "Route Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Message": {
+      "main": [
+        [
+          {
+            "node": "Apply Demo Command",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Human Handoff Notice",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Priye BDM + IB Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hand Chat Back to AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Demo Command": {
+      "main": [
+        [
+          {
+            "node": "Save Demo State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Demo State": {
+      "main": [
+        [
+          {
+            "node": "Send Demo Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Priye BDM + IB Agent": {
+      "main": [
+        [
+          {
+            "node": "Prepare Telegram Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Sonnet 5.5": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Priye BDM + IB Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Per-Client Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Priye BDM + IB Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "exness_knowledge_base": {
+      "ai_tool": [
+        [
+          {
+            "node": "Priye BDM + IB Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Query Embeddings": {
+      "ai_embedding": [
+        [
+          {
+            "node": "exness_knowledge_base",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Telegram Reply": {
+      "main": [
+        [
+          {
+            "node": "Send Agent Reply",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Needs Escalation?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs Escalation?": {
+      "main": [
+        [
+          {
+            "node": "Mark Escalated in CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Escalated in CRM": {
+      "main": [
+        [
+          {
+            "node": "Alert Sales Rep",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Human Handoff Notice": {
+      "main": [
+        [
+          {
+            "node": "Forward to Sales Rep",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Fallback Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Priye BDM + IB Agent",
+            "type": "ai_languageModel",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Hand Chat Back to AI": {
+      "main": [
+        [
+          {
+            "node": "Has Staff Message?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Confirm to Staff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Staff Message?": {
+      "main": [
+        [
+          {
+            "node": "Send Staff Reply to Client",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "active": false
+}

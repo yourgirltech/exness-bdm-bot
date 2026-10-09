@@ -1,0 +1,188 @@
+{
+  "name": "Exness BDM Bot - CRM Dashboard API",
+  "nodes": [
+    {
+      "id": "be6acdfb-1baa-4352-817c-5254993cedc8",
+      "name": "CRM API Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "exness-crm",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "d50ef0aa-680a-467d-a448-cb5024a002a4"
+    },
+    {
+      "id": "13af86c7-f3d0-4196-8564-82715cbe3a11",
+      "name": "Valid Dashboard Key?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        220,
+        200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.headers['x-dashboard-key'] }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "YOUR_DASHBOARD_KEY"
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "e2d473ef-be12-4a30-ba0d-dab75f9886a4",
+      "name": "Get All Clients",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        100
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "INVE0xh2Vtt6TCpj",
+          "cachedResultName": "exness_crm_demo"
+        },
+        "returnAll": true
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "ea68b983-d332-44bb-a6c9-7c253447325e",
+      "name": "Shape CRM Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const clients = $input.all().map(i => i.json).filter(r => r && r.chat_id).map(r => ({\n  id: r.id, chat_id: r.chat_id, first_name: r.first_name || 'Unknown',\n  registered: r.registered === true, kyc_verified: r.kyc_verified === true,\n  ftd_amount: Number(r.ftd_amount || 0), balance: Number(r.balance || 0),\n  days_inactive: Number(r.days_inactive || 0), is_ib: r.is_ib === true,\n  ib_referrals: Number(r.ib_referrals || 0), ib_link: r.ib_link || '',\n  one_on_one_booked: r.one_on_one_booked === true, escalated: r.escalated === true, escalation_reason: r.escalation_reason || '',\n  last_track: r.last_track || 'GENERAL',\n  created_at: r.createdAt, updated_at: r.updatedAt\n}));\nreturn [{ json: { ok: true, generated_at: new Date().toISOString(), clients } }];"
+      }
+    },
+    {
+      "id": "a3136634-1cbb-48b8-9103-1b347028c68d",
+      "name": "Return CRM JSON",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        880,
+        100
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "2e092bd5-8623-4886-b4f7-2b313aea3d6b",
+      "name": "Reject Unauthorized",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        440,
+        320
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"ok\":false,\"error\":\"unauthorized\"}",
+        "options": {
+          "responseCode": 401
+        }
+      }
+    }
+  ],
+  "connections": {
+    "CRM API Request": {
+      "main": [
+        [
+          {
+            "node": "Valid Dashboard Key?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid Dashboard Key?": {
+      "main": [
+        [
+          {
+            "node": "Get All Clients",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reject Unauthorized",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Clients": {
+      "main": [
+        [
+          {
+            "node": "Shape CRM Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shape CRM Payload": {
+      "main": [
+        [
+          {
+            "node": "Return CRM JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "active": false
+}

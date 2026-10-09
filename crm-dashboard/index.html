@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BDM Command Center</title>
+<meta name="description" content="Live CRM for the Exness BDM + IB Growth Telegram assistant">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f6f8;--surface:#ffffff;--surface-2:#f0f2f5;--border:#e3e6eb;--text:#0f1621;--muted:#5d6878;--faint:#8b95a3;
+  --accent:#c99a06;--accent-soft:#fff6d6;--accent-ink:#7a5c00;
+  --good:#0f8a5f;--good-soft:#e2f5ed;--warn:#b45309;--warn-soft:#fdf0e1;--bad:#c2410c;--bad-soft:#fde8df;
+  --info:#2457c5;--info-soft:#e5edfc;--violet:#6d3fc0;--violet-soft:#efe8fb;
+  --shadow:0 1px 2px rgba(15,22,33,.05),0 4px 16px rgba(15,22,33,.05);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0b0f15;--surface:#121821;--surface-2:#18202b;--border:#232d3a;--text:#e8edf3;--muted:#9aa6b5;--faint:#6c7887;
+    --accent:#f2c230;--accent-soft:#2b2410;--accent-ink:#f6d468;
+    --good:#34c88f;--good-soft:#0f2a20;--warn:#f0a246;--warn-soft:#2c1f0e;--bad:#f2784b;--bad-soft:#2e170e;
+    --info:#6f9cff;--info-soft:#121f3b;--violet:#a98bf0;--violet-soft:#1f1736;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0b0f15;--surface:#121821;--surface-2:#18202b;--border:#232d3a;--text:#e8edf3;--muted:#9aa6b5;--faint:#6c7887;
+  --accent:#f2c230;--accent-soft:#2b2410;--accent-ink:#f6d468;
+  --good:#34c88f;--good-soft:#0f2a20;--warn:#f0a246;--warn-soft:#2c1f0e;--bad:#f2784b;--bad-soft:#2e170e;
+  --info:#6f9cff;--info-soft:#121f3b;--violet:#a98bf0;--violet-soft:#1f1736;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer;background:none;border:0}
+.wrap{max-width:1320px;margin:0 auto;padding:0 24px 48px}
+header.top{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+.top-inner{max-width:1320px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#e8a600);display:grid;place-items:center;color:#1a1300;font-weight:700;font-size:15px;flex:none}
+.brand h1{font-size:16px;font-weight:650;letter-spacing:-.01em}
+.brand p{font-size:12px;color:var(--muted)}
+.top-actions{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;font-size:12px;font-weight:550;border:1px solid var(--border);background:var(--surface);white-space:nowrap}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--faint)}
+.pill.live .dot{background:var(--good);box-shadow:0 0 0 0 var(--good);animation:pulse 2s infinite}
+.pill.demo{background:var(--warn-soft);border-color:transparent;color:var(--warn)}
+.pill.demo .dot{background:var(--warn)}
+@keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--good) 60%,transparent)}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);font-size:13px;font-weight:550;transition:background .15s}
+.btn:hover{background:var(--surface-2)}
+.btn svg{width:15px;height:15px}
+.spin svg{animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.muted{color:var(--muted)}.faint{color:var(--faint)}
+.banner{margin:20px 0 0;padding:12px 16px;border-radius:10px;background:var(--warn-soft);color:var(--warn);font-size:13px;display:none;gap:10px;align-items:flex-start}
+.banner.show{display:flex}
+.banner b{font-weight:650}
+.section-title{display:flex;align-items:baseline;justify-content:space-between;margin:28px 0 12px;gap:12px}
+.section-title h2{font-size:15px;font-weight:650;letter-spacing:-.01em}
+.section-title span{font-size:12px;color:var(--faint)}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow)}
+.kpi{padding:16px 18px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.kpi .label{font-size:12px;color:var(--muted);font-weight:550;display:flex;align-items:center;gap:6px}
+.kpi .value{font-size:26px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.kpi .sub{font-size:12px;color:var(--faint)}
+.kpi .ico{width:22px;height:22px;border-radius:6px;display:grid;place-items:center}
+.kpi .ico svg{width:13px;height:13px}
+.grid-2{display:grid;grid-template-columns:1.4fr 1fr;gap:14px}
+.panel{padding:18px 20px}
+.panel h3{font-size:13px;font-weight:650;margin-bottom:4px}
+.panel .hint{font-size:12px;color:var(--faint);margin-bottom:16px}
+.funnel{display:flex;flex-direction:column;gap:10px}
+.f-row{display:grid;grid-template-columns:130px 1fr 72px;align-items:center;gap:12px}
+.f-row .n{font-size:13px;color:var(--muted)}
+.f-bar{height:26px;background:var(--surface-2);border-radius:7px;overflow:hidden}
+.f-fill{height:100%;border-radius:7px;background:linear-gradient(90deg,var(--accent),color-mix(in srgb,var(--accent) 70%,#fff));transition:width .6s cubic-bezier(.2,.8,.2,1)}
+.f-row .v{font-variant-numeric:tabular-nums;font-weight:650;text-align:right;font-size:13px}
+.f-row .v small{color:var(--faint);font-weight:500;margin-left:4px}
+.tracks{display:flex;align-items:center;gap:22px}
+.donut{width:140px;height:140px;border-radius:50%;flex:none;position:relative}
+.donut::after{content:"";position:absolute;inset:22px;background:var(--surface);border-radius:50%}
+.donut-c{position:absolute;inset:0;display:grid;place-items:center;z-index:1;text-align:center}
+.donut-c b{font-size:22px;display:block}
+.donut-c span{font-size:11px;color:var(--faint)}
+.legend{display:flex;flex-direction:column;gap:10px;flex:1;min-width:0}
+.lg{display:flex;align-items:center;gap:10px;font-size:13px}
+.lg i{width:10px;height:10px;border-radius:3px;flex:none}
+.lg .c{margin-left:auto;font-weight:650;font-variant-numeric:tabular-nums}
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:14px 16px;border-bottom:1px solid var(--border)}
+.search{flex:1;min-width:200px;position:relative}
+.search input{width:100%;padding:8px 12px 8px 34px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font:inherit;outline:none}
+.search input:focus{border-color:var(--accent);background:var(--surface)}
+.search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--faint)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{padding:6px 11px;border-radius:999px;border:1px solid var(--border);font-size:12px;font-weight:550;color:var(--muted);background:var(--surface)}
+.chip.on{background:var(--text);color:var(--bg);border-color:var(--text)}
+.chip .ct{opacity:.65;margin-left:4px}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:980px}
+th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);font-weight:600;padding:10px 16px;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:12px 16px;border-bottom:1px solid var(--border);vertical-align:middle;white-space:nowrap}
+tbody tr{cursor:pointer;transition:background .12s}
+tbody tr:hover{background:var(--surface-2)}
+tbody tr:last-child td{border-bottom:0}
+.num{font-variant-numeric:tabular-nums;text-align:right}
+th.num{text-align:right}
+.who{display:flex;align-items:center;gap:10px}
+.av{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-weight:650;font-size:12px;flex:none}
+.who b{font-weight:600;display:block}
+.who small{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--faint)}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:6px;font-size:11.5px;font-weight:600}
+.b-good{background:var(--good-soft);color:var(--good)}
+.b-warn{background:var(--warn-soft);color:var(--warn)}
+.b-bad{background:var(--bad-soft);color:var(--bad)}
+.b-info{background:var(--info-soft);color:var(--info)}
+.b-violet{background:var(--violet-soft);color:var(--violet)}
+.b-gold{background:var(--accent-soft);color:var(--accent-ink)}
+.b-mute{background:var(--surface-2);color:var(--muted)}
+.empty{padding:48px 16px;text-align:center;color:var(--faint)}
+.stage{display:flex;gap:3px}
+.stage i{width:16px;height:5px;border-radius:2px;background:var(--surface-2)}
+.stage i.on{background:var(--accent)}
+.drawer-bg{position:fixed;inset:0;background:rgba(5,8,12,.45);opacity:0;pointer-events:none;transition:opacity .2s;z-index:40}
+.drawer{position:fixed;top:0;right:0;height:100%;width:min(480px,100%);background:var(--surface);border-left:1px solid var(--border);z-index:50;transform:translateX(100%);transition:transform .25s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column}
+.open .drawer-bg{opacity:1;pointer-events:auto}
+.open .drawer{transform:none}
+.d-head{padding:20px 22px;border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:center}
+.d-head .av{width:44px;height:44px;font-size:15px}
+.d-head h3{font-size:17px;font-weight:650}
+.d-close{margin-left:auto;width:32px;height:32px;border-radius:8px;display:grid;place-items:center}
+.d-close:hover{background:var(--surface-2)}
+.d-body{padding:18px 22px 28px;overflow-y:auto;display:flex;flex-direction:column;gap:16px}
+.thread{border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.thread-h{padding:10px 14px;font-size:12px;font-weight:650;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);background:var(--surface-2)}
+.thread-h code{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--faint);font-weight:500;margin-left:auto}
+.kv{display:grid;grid-template-columns:1fr 1fr}
+.kv div{padding:10px 14px;border-bottom:1px solid var(--border)}
+.kv div:nth-child(odd){border-right:1px solid var(--border)}
+.kv div:nth-last-child(-n+2){border-bottom:0}
+.kv span{display:block;font-size:11px;color:var(--faint);margin-bottom:2px}
+.kv b{font-weight:600;font-variant-numeric:tabular-nums}
+.nba{padding:14px 16px;border-radius:12px;background:var(--accent-soft);color:var(--accent-ink)}
+.nba h4{font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+.nba p{color:var(--text);font-size:13.5px}
+.gate{padding:12px 14px;border-radius:10px;font-size:13px;display:flex;gap:10px;align-items:flex-start}
+.gate ul{margin:6px 0 0 16px}
+footer{margin-top:28px;font-size:12px;color:var(--faint);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+@media (max-width:1000px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.grid-2{grid-template-columns:1fr}}
+@media (max-width:560px){.wrap,.top-inner{padding-left:16px;padding-right:16px}.kpi .value{font-size:22px}.f-row{grid-template-columns:96px 1fr 60px}.tracks{flex-direction:column;align-items:flex-start}.brand p{display:none}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">
+      <div class="logo">P</div>
+      <div>
+        <h1>BDM Command Center</h1>
+        <p>Priye AI assistant · Retail Trading &amp; IB Growth CRM</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <span id="status" class="pill"><span class="dot"></span><span id="statusText">Connecting…</span></span>
+      <span class="pill faint" id="synced">—</span>
+      <button class="btn" id="refresh" title="Refresh now"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>Refresh</button>
+      <button class="btn" id="theme" title="Toggle theme" aria-label="Toggle theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="banner" id="banner">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex:none;margin-top:2px"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+    <div><b>Showing sample data.</b> <span id="bannerText">The live CRM connection is offline.</span> Real Telegram clients appear here automatically once the n8n link is online.</div>
+  </div>
+
+  <div class="section-title"><h2>Pipeline overview</h2><span>Auto-refreshes every 10 seconds</span></div>
+  <section class="kpis" id="kpis"></section>
+
+  <section class="grid-2" style="margin-top:14px">
+    <div class="card panel">
+      <h3>Conversion funnel</h3>
+      <p class="hint">Lead → registered → KYC → funded (FTD) → 1-on-1 handoff</p>
+      <div class="funnel" id="funnel"></div>
+    </div>
+    <div class="card panel">
+      <h3>Conversation tracks</h3>
+      <p class="hint">Latest routing decision per client (dual-track protocol)</p>
+      <div class="tracks">
+        <div class="donut" id="donut"><div class="donut-c"><div><b id="donutTotal">0</b><span>clients</span></div></div></div>
+        <div class="legend" id="legend"></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-title"><h2>Clients</h2><span id="countLabel"></span></div>
+  <section class="card">
+    <div class="toolbar">
+      <label class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input id="q" placeholder="Search by name or chat ID" autocomplete="off"></label>
+      <div class="chips" id="chips"></div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Client</th><th>Stage</th><th>Status</th><th class="num">FTD</th><th class="num">Balance</th><th class="num">Inactive</th><th>IB partner</th><th>1-on-1</th><th>Last track</th><th>Last activity</th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    <span>Data source: n8n data table <code>exness_crm_demo</code> via secure proxy · Demo CRM, not live Exness accounts</span>
+    <span>Built by Koret</span>
+  </footer>
+</main>
+
+<div id="drawerRoot">
+  <div class="drawer-bg" id="drawerBg"></div>
+  <aside class="drawer" id="drawer" aria-hidden="true"></aside>
+</div>
+
+<script>
+const SAMPLE = [
+  { id: 1, chat_id: '6011223344', first_name: 'Farook', registered: true, kyc_verified: true, ftd_amount: 0, balance: 0, days_inactive: 0, is_ib: true, ib_referrals: 10, ib_link: 'https://one.exness.link/a/demo-ib-23344', one_on_one_booked: false, last_track: 'MIXED', updated_at: minsAgo(3) },
+  { id: 2, chat_id: '6022334455', first_name: 'Amaka', registered: true, kyc_verified: true, ftd_amount: 500, balance: 742, days_inactive: 1, is_ib: false, ib_referrals: 0, ib_link: '', one_on_one_booked: true, last_track: 'TRADING', updated_at: minsAgo(12) },
+  { id: 3, chat_id: '6033445566', first_name: 'Tunde', registered: true, kyc_verified: true, ftd_amount: 200, balance: 4, days_inactive: 27, is_ib: false, ib_referrals: 0, ib_link: '', one_on_one_booked: false, last_track: 'TRADING', updated_at: minsAgo(60 * 26) },
+  { id: 4, chat_id: '6044556677', first_name: 'Zainab', registered: true, kyc_verified: false, ftd_amount: 0, balance: 0, days_inactive: 0, is_ib: false, ib_referrals: 0, ib_link: '', one_on_one_booked: false, escalated: true, escalation_reason: 'Withdrawal dispute, client frustrated after two attempts', last_track: 'TRADING', updated_at: minsAgo(41) },
+  { id: 5, chat_id: '6055667788', first_name: 'Chidi', registered: true, kyc_verified: true, ftd_amount: 1000, balance: 1385, days_inactive: 2, is_ib: true, ib_referrals: 4, ib_link: 'https://one.exness.link/a/demo-ib-67788', one_on_one_booked: false, last_track: 'IB', updated_at: minsAgo(95) },
+  { id: 6, chat_id: '6066778899', first_name: 'Grace', registered: false, kyc_verified: false, ftd_amount: 0, balance: 0, days_inactive: 0, is_ib: false, ib_referrals: 0, ib_link: '', one_on_one_booked: false, last_track: 'GENERAL', updated_at: minsAgo(7) },
+];
+function minsAgo(m) { return new Date(Date.now() - m * 60000).toISOString(); }
+
+const state = { clients: [], filter: 'all', q: '', source: '', selected: null, loading: false };
+const $ = (s) => document.querySelector(s);
+const money = (n) => '$' + Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const TRACK = {
+  TRADING: { label: 'Trading', cls: 'b-info', color: 'var(--info)' },
+  IB: { label: 'IB Growth', cls: 'b-violet', color: 'var(--violet)' },
+  MIXED: { label: 'Mixed', cls: 'b-gold', color: 'var(--accent)' },
+  GENERAL: { label: 'General', cls: 'b-mute', color: 'var(--faint)' },
+};
+const PALETTE = ['#2457c5', '#0f8a5f', '#6d3fc0', '#c2410c', '#b45309', '#0e7490', '#a21caf'];
+
+function derive(c) {
+  const eligible = c.registered && c.kyc_verified && c.ftd_amount > 0 && c.balance > 0;
+  const dormant = c.registered && c.days_inactive >= 20;
+  let stage = 0;
+  if (c.registered) stage = 1;
+  if (c.registered && c.kyc_verified) stage = 2;
+  if (c.ftd_amount > 0) stage = 3;
+  if (c.one_on_one_booked) stage = 4;
+  const stageName = ['New lead', 'Registered', 'KYC verified', 'Funded', 'Handed to BDM'][stage];
+  const missing = [];
+  if (!c.registered) missing.push('Register a personal Exness account');
+  if (c.registered && !c.kyc_verified) missing.push('Complete KYC verification');
+  if (c.ftd_amount <= 0) missing.push('Make the first-time deposit');
+  if (c.balance <= 0 && c.ftd_amount > 0) missing.push('Top up the personal balance');
+  let status = { t: 'Active', cls: 'b-good' };
+  if (c.escalated) status = { t: 'Escalated to rep', cls: 'b-bad' };
+  else if (c.one_on_one_booked) status = { t: 'Human handoff', cls: 'b-gold' };
+  else if (dormant) status = { t: 'Dormant', cls: 'b-bad' };
+  else if (!c.registered) status = { t: 'Onboarding', cls: 'b-info' };
+  else if (c.ftd_amount <= 0) status = { t: 'Awaiting FTD', cls: 'b-warn' };
+  return { eligible, dormant, stage, stageName, missing, status };
+}
+
+function nextAction(c, d) {
+  if (c.escalated) return 'Escalated to a live sales rep: ' + (c.escalation_reason || 'conversation needs a human') + '. Take over the Telegram chat, then send /demo resume to hand back to the AI.';
+  if (c.one_on_one_booked) return 'Automation is frozen. Mr. Piriye should review the full history and lead the 1-on-1 strategy session personally.';
+  if (c.is_ib && c.ib_referrals >= 10 && !d.eligible) return 'IB milestone reached but personal account is unfunded. Celebrate the 10-referral win and drive the personal deposit to unlock the 1-on-1.';
+  if (!c.registered) return 'Send the approved Exness sign-up link and confirm registration via CRM before releasing onboarding assets.';
+  if (!c.kyc_verified) return 'Resolve KYC friction: walk through proof of identity and residence upload in the Personal Area.';
+  if (c.ftd_amount <= 0) return 'Funding journey: recommend the Standard account (from about $10) and capture a funding commitment date for a 24h reminder.';
+  if (d.dormant) return 'Run the 20-day reactivation path: empathetic check-in, diagnose the reason, then offer a tailored recovery route.';
+  if (!c.is_ib) return 'Client is funded and active. Introduce the IB partner programme (up to 40% revenue share, daily payouts).';
+  return 'Weekly IB growth check-in: review referral funnel drop-off and share one traffic tactic. Client is eligible for the 1-on-1.';
+}
+
+function ago(iso) {
+  if (!iso) return '—';
+  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return 'just now';
+  if (s < 3600) return Math.floor(s / 60) + 'm ago';
+  if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+  return Math.floor(s / 86400) + 'd ago';
+}
+function initials(n) { const p = String(n || '?').replace(/[^\p{L}\p{N} ]/gu, '').trim().split(/\s+/); return ((p[0] || '?')[0] + (p[1] ? p[1][0] : '')).toUpperCase(); }
+function avColor(id) { const c = PALETTE[Number(String(id).slice(-2)) % PALETTE.length]; return `background:${c}22;color:${c}`; }
+function maskId(id) { const s = String(id); return s.length > 6 ? s.slice(0, 3) + '•••' + s.slice(-3) : s; }
+
+const ICONS = {
+  users: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  wallet: '<path d="M20 7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16V7"/><circle cx="16" cy="14" r="1.5"/>',
+  share: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/>',
+  star: '<path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/>',
+  moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
+  hand: '<path d="M18 11V6a2 2 0 0 0-4 0v5M14 10V4a2 2 0 0 0-4 0v6M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>',
+  trend: '<path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/>',
+};
+function kpi(label, value, sub, icon, tone) {
+  return `<div class="card kpi"><div class="label"><span class="ico ${tone}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${ICONS[icon]}</svg></span>${label}</div><div class="value">${value}</div><div class="sub">${sub}</div></div>`;
+}
+
+function render() {
+  const all = state.clients.map((c) => ({ c, d: derive(c) }));
+  const n = all.length || 0;
+  const funded = all.filter((x) => x.c.ftd_amount > 0).length;
+  const totalBal = all.reduce((a, x) => a + x.c.balance, 0);
+  const totalFtd = all.reduce((a, x) => a + x.c.ftd_amount, 0);
+  const ibs = all.filter((x) => x.c.is_ib).length;
+  const refs = all.reduce((a, x) => a + x.c.ib_referrals, 0);
+  const elig = all.filter((x) => x.d.eligible).length;
+  const dormant = all.filter((x) => x.d.dormant).length;
+  const handoff = all.filter((x) => x.c.one_on_one_booked).length;
+  const escal = all.filter((x) => x.c.escalated).length;
+  const kyc = all.filter((x) => x.c.kyc_verified).length;
+  const pct = (a) => (n ? Math.round((a / n) * 100) : 0);
+
+  $('#kpis').innerHTML = [
+    kpi('Total clients', n, 'Telegram conversations in CRM', 'users', 'b-info'),
+    kpi('Funded (FTD)', funded, pct(funded) + '% conversion · ' + money(totalFtd) + ' deposited', 'wallet', 'b-good'),
+    kpi('Client balances', money(totalBal), 'Across funded personal accounts', 'trend', 'b-gold'),
+    kpi('1-on-1 eligible', elig, handoff + ' handed to Mr. Piriye', 'star', 'b-violet'),
+    kpi('IB partners', ibs, refs + ' verified referrals total', 'share', 'b-violet'),
+    kpi('KYC verified', kyc, pct(kyc) + '% of clients', 'check', 'b-good'),
+    kpi('Dormant (20d+)', dormant, 'Reactivation path recommended', 'moon', 'b-bad'),
+    kpi('Live-rep escalations', escal, handoff + ' 1-on-1 handoffs · AI paused', 'hand', 'b-bad'),
+  ].join('');
+
+  const steps = [
+    ['Leads', n],
+    ['Registered', all.filter((x) => x.c.registered).length],
+    ['KYC verified', all.filter((x) => x.c.registered && x.c.kyc_verified).length],
+    ['Funded (FTD)', funded],
+    ['1-on-1 handoff', handoff],
+  ];
+  $('#funnel').innerHTML = steps.map(([name, v]) => `<div class="f-row"><span class="n">${name}</span><div class="f-bar"><div class="f-fill" style="width:${n ? Math.max(v ? 4 : 0, (v / n) * 100) : 0}%"></div></div><span class="v">${v}<small>${pct(v)}%</small></span></div>`).join('');
+
+  const tc = { TRADING: 0, IB: 0, MIXED: 0, GENERAL: 0 };
+  all.forEach((x) => { tc[x.c.last_track in tc ? x.c.last_track : 'GENERAL']++; });
+  let acc = 0;
+  const stops = Object.keys(tc).map((k) => { const from = acc; acc += n ? (tc[k] / n) * 360 : 0; return `${TRACK[k].color} ${from}deg ${acc}deg`; });
+  $('#donut').style.background = n ? `conic-gradient(${stops.join(',')})` : 'var(--surface-2)';
+  $('#donutTotal').textContent = n;
+  $('#legend').innerHTML = Object.keys(tc).map((k) => `<div class="lg"><i style="background:${TRACK[k].color}"></i>${TRACK[k].label}<span class="c">${tc[k]}</span></div>`).join('');
+
+  const filters = {
+    all: ['All', () => true],
+    eligible: ['1-on-1 eligible', (x) => x.d.eligible],
+    unfunded: ['Awaiting FTD', (x) => x.c.ftd_amount <= 0],
+    ib: ['IB partners', (x) => x.c.is_ib],
+    dormant: ['Dormant', (x) => x.d.dormant],
+    escalated: ['Escalated', (x) => x.c.escalated],
+    handoff: ['Handoff', (x) => x.c.one_on_one_booked],
+  };
+  $('#chips').innerHTML = Object.entries(filters).map(([k, [label, fn]]) => `<button class="chip ${state.filter === k ? 'on' : ''}" data-f="${k}">${label}<span class="ct">${all.filter(fn).length}</span></button>`).join('');
+
+  const q = state.q.toLowerCase();
+  const rows = all
+    .filter(filters[state.filter][1])
+    .filter((x) => !q || x.c.first_name.toLowerCase().includes(q) || String(x.c.chat_id).includes(q))
+    .sort((a, b) => new Date(b.c.updated_at || 0) - new Date(a.c.updated_at || 0));
+  $('#countLabel').textContent = rows.length + ' of ' + n + ' shown';
+
+  $('#rows').innerHTML = rows.length ? rows.map(({ c, d }) => `
+    <tr data-id="${esc(c.chat_id)}">
+      <td><div class="who"><span class="av" style="${avColor(c.chat_id)}">${esc(initials(c.first_name))}</span><div><b>${esc(c.first_name)}</b><small>${esc(maskId(c.chat_id))}</small></div></div></td>
+      <td><div title="${d.stageName}"><div class="stage">${[0, 1, 2, 3, 4].map((i) => `<i class="${i <= d.stage ? 'on' : ''}"></i>`).join('')}</div><small class="faint">${d.stageName}</small></div></td>
+      <td><span class="badge ${d.status.cls}">${d.status.t}</span></td>
+      <td class="num">${c.ftd_amount ? money(c.ftd_amount) : '<span class="faint">—</span>'}</td>
+      <td class="num">${money(c.balance)}</td>
+      <td class="num ${c.days_inactive >= 20 ? '' : 'faint'}" style="${c.days_inactive >= 20 ? 'color:var(--bad);font-weight:600' : ''}">${c.days_inactive}d</td>
+      <td>${c.is_ib ? `<span class="badge b-violet">${c.ib_referrals} referrals${c.ib_referrals >= 10 ? ' 🏆' : ''}</span>` : '<span class="faint">—</span>'}</td>
+      <td>${c.one_on_one_booked ? '<span class="badge b-gold">Booked</span>' : d.eligible ? '<span class="badge b-good">Eligible</span>' : '<span class="badge b-mute">Locked</span>'}</td>
+      <td><span class="badge ${TRACK[c.last_track]?.cls || 'b-mute'}">${TRACK[c.last_track]?.label || 'General'}</span></td>
+      <td class="faint">${ago(c.updated_at)}</td>
+    </tr>`).join('') : `<tr><td colspan="10" class="empty">No clients match this view yet. Message @PriyeBot on Telegram to create one.</td></tr>`;
+
+  if (state.selected) openDrawer(state.selected);
+}
+
+function openDrawer(chatId) {
+  const c = state.clients.find((x) => String(x.chat_id) === String(chatId));
+  if (!c) return closeDrawer();
+  state.selected = chatId;
+  const d = derive(c);
+  const gate = d.eligible
+    ? `<div class="gate b-good"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" style="flex:none;margin-top:2px"><path d="M20 6 9 17l-5-5"/></svg><div><b>1-on-1 eligible.</b> CRM validation passed. The assistant may share the private booking link.</div></div>`
+    : `<div class="gate b-warn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" style="flex:none;margin-top:2px"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><div><b>1-on-1 locked.</b> Booking link withheld until:<ul>${d.missing.map((m) => `<li>${m}</li>`).join('')}</ul></div></div>`;
+  $('#drawer').innerHTML = `
+    <div class="d-head"><span class="av" style="${avColor(c.chat_id)}">${esc(initials(c.first_name))}</span><div><h3>${esc(c.first_name)}</h3><span class="badge ${d.status.cls}">${d.status.t}</span> <span class="faint" style="font-size:12px;margin-left:4px">Telegram ${esc(maskId(c.chat_id))}</span></div><button class="d-close" id="dClose" aria-label="Close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+    <div class="d-body">
+      <div class="nba"><h4>Next best action</h4><p>${nextAction(c, d)}</p></div>
+      ${gate}
+      <div class="thread"><div class="thread-h"><span class="badge b-info">BDM</span>Retail trading track<code>Thread_Retail_Trading</code></div>
+        <div class="kv"><div><span>Registered</span><b>${c.registered ? 'Yes' : 'No'}</b></div><div><span>KYC verified</span><b>${c.kyc_verified ? 'Yes' : 'No'}</b></div><div><span>First-time deposit</span><b>${money(c.ftd_amount)}</b></div><div><span>Balance</span><b>${money(c.balance)}</b></div><div><span>Days inactive</span><b>${c.days_inactive}${d.dormant ? ' · dormant' : ''}</b></div><div><span>Stage</span><b>${d.stageName}</b></div></div></div>
+      <div class="thread"><div class="thread-h"><span class="badge b-violet">IB</span>Affiliate growth track<code>Thread_Affiliate_IB</code></div>
+        <div class="kv"><div><span>IB partner</span><b>${c.is_ib ? 'Active' : 'Not yet'}</b></div><div><span>Verified referrals</span><b>${c.ib_referrals}${c.ib_referrals >= 10 ? ' · milestone' : ''}</b></div><div style="grid-column:1/-1;border-right:0"><span>Partner link</span><b style="font-family:'JetBrains Mono',monospace;font-size:12px;word-break:break-all">${c.ib_link ? esc(c.ib_link) : '—'}</b></div></div></div>
+      <div class="thread"><div class="thread-h">Conversation</div>
+        <div class="kv"><div><span>Last routed track</span><b>${TRACK[c.last_track]?.label || 'General'}</b></div><div><span>Automation</span><b>${c.escalated ? 'Paused (live rep)' : c.one_on_one_booked ? 'Frozen (1-on-1)' : 'AI active'}</b></div><div><span>First contact</span><b>${c.created_at ? new Date(c.created_at).toLocaleDateString() : '—'}</b></div><div><span>Last activity</span><b>${ago(c.updated_at)}</b></div></div></div>
+    </div>`;
+  $('#drawer').setAttribute('aria-hidden', 'false');
+  document.body.classList.add('open');
+  $('#dClose').onclick = closeDrawer;
+}
+function closeDrawer() { state.selected = null; document.body.classList.remove('open'); $('#drawer').setAttribute('aria-hidden', 'true'); }
+
+async function load() {
+  if (state.loading) return;
+  state.loading = true;
+  $('#refresh').classList.add('spin');
+  let live = false;
+  try {
+    const r = await fetch('/api/crm', { cache: 'no-store' });
+    const j = await r.json();
+    if (j.ok && Array.isArray(j.clients)) { state.clients = j.clients; live = true; }
+    else state.source = j.source || 'offline';
+  } catch (e) { state.source = 'offline'; }
+  if (!live) state.clients = SAMPLE;
+  $('#status').className = 'pill ' + (live ? 'live' : 'demo');
+  $('#statusText').textContent = live ? 'Live CRM' : 'Sample data';
+  $('#banner').classList.toggle('show', !live);
+  $('#bannerText').textContent = state.source === 'unconfigured' ? 'The live n8n link has not been configured yet.' : 'The live n8n link is currently offline (the local tunnel may be stopped).';
+  $('#synced').textContent = 'Synced ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  render();
+  state.loading = false;
+  setTimeout(() => $('#refresh').classList.remove('spin'), 300);
+}
+
+$('#refresh').onclick = load;
+$('#q').oninput = (e) => { state.q = e.target.value; render(); };
+$('#chips').onclick = (e) => { const b = e.target.closest('[data-f]'); if (b) { state.filter = b.dataset.f; render(); } };
+$('#rows').onclick = (e) => { const tr = e.target.closest('tr[data-id]'); if (tr) openDrawer(tr.dataset.id); };
+$('#drawerBg').onclick = closeDrawer;
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
+$('#theme').onclick = () => {
+  const root = document.documentElement;
+  const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  root.dataset.theme = dark ? 'light' : 'dark';
+  try { localStorage.setItem('crm-theme', root.dataset.theme); } catch (e) {}
+};
+try { const t = localStorage.getItem('crm-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+load();
+setInterval(load, 10000);
+</script>
+</body>
+</html>

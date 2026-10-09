@@ -1,0 +1,255 @@
+{
+  "name": "Exness BDM Bot - KB Ingestion",
+  "nodes": [
+    {
+      "id": "9723826e-4d26-48a0-8618-ab78c75a6139",
+      "name": "Run Ingestion",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "37276a62-ebbe-4082-8f2d-8ddad865c31e",
+      "name": "Load KB Sections",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const kb = String($input.first().json.data || '');\nif (kb.length < 1000) throw new Error('Knowledge base download looks empty or truncated');\nconst parts = kb.split('\\n## ');\nconst out = [];\nfor (let i = 1; i < parts.length; i++) {\n  const p = parts[i];\n  const nl = p.indexOf('\\n');\n  const section = p.slice(0, nl).trim();\n  out.push({ json: { section, text: '## ' + p.trim() } });\n}\nreturn out;"
+      }
+    },
+    {
+      "id": "61f62313-66c6-4ce8-93cb-e222fc0e9caa",
+      "name": "Exness KB Vector Store",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreInMemory",
+      "typeVersion": 1.3,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "mode": "insert",
+        "memoryKey": {
+          "__rl": true,
+          "mode": "id",
+          "value": "exness_kb"
+        },
+        "clearStore": true
+      }
+    },
+    {
+      "id": "436b32c1-ca8f-4c80-8938-a7bae6425362",
+      "name": "Gemini Embeddings",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        420,
+        220
+      ],
+      "parameters": {
+        "modelName": "models/gemini-embedding-001"
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "id": "07b0d864-addb-4bc2-a25c-51967eb3ca76",
+      "name": "KB Document Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        600,
+        220
+      ],
+      "parameters": {
+        "dataType": "json",
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $json.text }}",
+        "textSplittingMode": "custom",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "section",
+                "value": "={{ $json.section }}"
+              },
+              {
+                "name": "source",
+                "value": "exness_public_pages_oct_2026"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "b93002b1-1606-4347-88cc-3edeaacd97ac",
+      "name": "Markdown Splitter",
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        640,
+        400
+      ],
+      "parameters": {
+        "chunkSize": 1200,
+        "chunkOverlap": 150,
+        "options": {
+          "splitCode": "markdown"
+        }
+      }
+    },
+    {
+      "id": "4686f69a-6f02-430a-9369-cf717caadf99",
+      "name": "Sticky Note ddac8853",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        100,
+        300
+      ],
+      "parameters": {
+        "content": "## Exness KB ingestion\nRun this once (and again after any n8n restart, since the Simple Vector Store lives in memory). It loads the Exness knowledge base into the shared vector key exness_kb, which the Telegram bot reads.",
+        "color": 4
+      }
+    },
+    {
+      "id": "e8c5db45-f553-40aa-9d73-136edc08c694",
+      "name": "Fetch Knowledge Base",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        120,
+        -160
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://your-dashboard.vercel.app/kb/exness_knowledge_base.md",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "632ff308-2995-4d05-a33f-492a1cb0f865",
+      "name": "On n8n Start",
+      "type": "n8n-nodes-base.n8nTrigger",
+      "typeVersion": 1,
+      "position": [
+        -120,
+        -160
+      ],
+      "parameters": {
+        "events": [
+          "init",
+          "activate"
+        ]
+      }
+    }
+  ],
+  "connections": {
+    "Load KB Sections": {
+      "main": [
+        [
+          {
+            "node": "Exness KB Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Embeddings": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Exness KB Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KB Document Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Exness KB Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Markdown Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "KB Document Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Ingestion": {
+      "main": [
+        [
+          {
+            "node": "Fetch Knowledge Base",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Knowledge Base": {
+      "main": [
+        [
+          {
+            "node": "Load KB Sections",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On n8n Start": {
+      "main": [
+        [
+          {
+            "node": "Fetch Knowledge Base",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "active": false
+}
