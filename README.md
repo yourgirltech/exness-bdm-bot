@@ -2,6 +2,8 @@
 
 A 24/7 AI sales assistant on Telegram for a forex broker's Business Development and IB (Introducing Broker) team. It answers questions from a curated knowledge base with RAG, moves each client to their next step (register → verify → fund → trade → refer), and hands the chat to a human sales rep whenever it should. A live CRM dashboard shows every client's stage.
 
+> **In production for a client.** The live system runs on the client's own domain and isn't linked here. This repository is the build record: the full source, with client data, credentials and URLs removed.
+
 Built with n8n, Claude, Gemini embeddings and a small Vercel dashboard.
 
 ## How it works
@@ -22,7 +24,7 @@ Staff reply to the alert in Telegram → delivered to the client → AI resumes,
 - **Compliance built into the prompt.** The prompt rules out promised profits, personalised investment advice and trade signals, adds risk reminders when the client discusses leverage or strategy, and never asks for passwords or OTP codes.
 - **Deterministic business rules.** Eligibility for the 1-on-1 strategy session and the routing between client and IB tracks are computed in code from CRM fields. The model only shares the booking link when the code says the client is eligible.
 - **A clean human handoff.** The AI escalates when it should (it emits an `[[ESCALATE: reason]]` marker, and hard triggers in code act as a backstop). The sales rep gets an alert with full context, the AI stays quiet in that chat, and when the rep replies, the client receives the reply and the AI picks the conversation back up.
-- **Demo mode.** `/demo register`, `/demo fund 500` and similar commands simulate CRM states live in a presentation.
+- **Walkthrough mode for stakeholders.** `/demo register`, `/demo fund 500` and similar commands move a test account through CRM states, so the team can be shown every journey without touching real client records.
 
 ## Repo layout
 
