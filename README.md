@@ -1,6 +1,6 @@
 # Exness BDM + IB Telegram Bot
 
-A 24/7 AI sales assistant on Telegram for a forex broker's Business Development and IB (Introducing Broker) team. It answers questions from a curated knowledge base with RAG, moves each client to their next step (register → verify → fund → trade → refer), and hands the chat to a human sales rep whenever it should. A live CRM dashboard shows every client's stage.
+A 24/7 AI sales assistant on Telegram for an Exness partner's Business Development and IB (Introducing Broker) team. It answers questions from a curated knowledge base with RAG, moves each client to their next step (register → verify → fund → trade → refer), and hands the chat to a human sales rep whenever it should. A live CRM dashboard shows every client's stage.
 
 > **In production for a client.** The live system runs on the client's own domain and isn't linked here. This repository is the build record: the full source, with client data, credentials and URLs removed.
 

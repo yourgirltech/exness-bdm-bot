@@ -708,7 +708,7 @@
         300
       ],
       "parameters": {
-        "content": "## Exness BDM + IB Telegram Bot (@PriyeBot)\nPolls Telegram every 5s (n8n runs on localhost, so no webhook). Each message: CRM lookup, dual-track routing and 1-on-1 eligibility validated in code, Claude agent with RAG over exness_kb, reply. Run the KB Ingestion workflow after any n8n restart. Type /demo in Telegram to simulate CRM states.",
+        "content": "## Exness BDM + IB Telegram Bot\nPolls Telegram every 5s (n8n runs on localhost, so no webhook). Each message: CRM lookup, dual-track routing and 1-on-1 eligibility validated in code, Claude agent with RAG over exness_kb, reply. Run the KB Ingestion workflow after any n8n restart. Type /demo in Telegram to simulate CRM states.",
         "color": 5
       }
     },

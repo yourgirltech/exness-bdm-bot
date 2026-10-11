@@ -214,7 +214,7 @@ footer{margin-top:28px;font-size:12px;color:var(--faint);display:flex;justify-co
   </section>
 
   <footer>
-    <span>Data source: n8n data table <code>exness_crm_demo</code> via secure proxy · Demo CRM, not live Exness accounts</span>
+    <span>Data source: n8n CRM table via secure proxy · This build record ships with sample data, not client records</span>
     <span>Built by Koret</span>
   </footer>
 </main>
@@ -381,7 +381,7 @@ function render() {
       <td>${c.one_on_one_booked ? '<span class="badge b-gold">Booked</span>' : d.eligible ? '<span class="badge b-good">Eligible</span>' : '<span class="badge b-mute">Locked</span>'}</td>
       <td><span class="badge ${TRACK[c.last_track]?.cls || 'b-mute'}">${TRACK[c.last_track]?.label || 'General'}</span></td>
       <td class="faint">${ago(c.updated_at)}</td>
-    </tr>`).join('') : `<tr><td colspan="10" class="empty">No clients match this view yet. Message @PriyeBot on Telegram to create one.</td></tr>`;
+    </tr>`).join('') : `<tr><td colspan="10" class="empty">No clients match this view yet. Message the bot on Telegram to create one.</td></tr>`;
 
   if (state.selected) openDrawer(state.selected);
 }
